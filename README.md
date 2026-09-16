@@ -1,4 +1,4 @@
-CrossApp - Практикум з крос-платформного програмування
+CrossApp - Практикум з крос-платформного програмування(Лабораторна 1)
 
 
 Предметна область: Склад
@@ -11,3 +11,22 @@ Cутності:
 
 Призначення застосунку:
 Програма призначена для обліку залишків товарів, керування партіями та відстеження переміщень між складами.
+
+## Структура Solution (Лабораторна 2)
+* **Core** — бібліотека класів (Class Library). Тут знаходиться вся логіка програми (наразі це збір даних про систему у `EnvironmentInfo.cs`). Цей проєкт повністю незалежний.
+* **Cli** — консольний застосунок (точка входу). Містить посилання (`ProjectReference`) на `Core`. Його єдина задача — викликати методи з ядра і виводити результат на екран.
+
+## Основні команди
+* **Запуск (під net9.0):** `dotnet run --project src/Cli -f net9.0`
+* **Запуск (під net8.0):** `dotnet run --project src/Cli -f net8.0`
+* **Framework-dependent збірка:** `dotnet publish src/Cli -c Release --no-self-contained -o ./publish/fd`
+* **Self-contained збірка (win-x64):** `dotnet publish src/Cli -c Release -r win-x64 --self-contained true -o ./publish/sc`
+
+## Порівняння варіантів публікації
+| RID | Режим публікації | Розмір | Потребує .NET Runtime? |
+| :--- | :--- | :--- | :--- |
+| (немає) | Framework-dependent | 189 КБ | Так |
+| win-x64 | Self-contained | 74.5 МБ | Ні |
+| win-x64 | Self-contained + SingleFile | ~74 МБ | Ні |
+| win-x64 | Self-contained + Trimmed | 19.2 МБ | Ні |
+| linux-x64 | Self-contained | 75.9 МБ | Ні |
