@@ -30,3 +30,8 @@ Cутності:
 | win-x64 | Self-contained + SingleFile | ~74 МБ | Ні |
 | win-x64 | Self-contained + Trimmed | 19.2 МБ | Ні |
 | linux-x64 | Self-contained | 75.9 МБ | Ні |
+
+## Домовленість про структуру каталогів у Core
+* `Core/Dto/` — record-типи формату даних (тиждень 3)
+* `Core/Domain/` — сутності з поведінкою та інваріантами (тиждень 4)
+* `Core/Storage/` — реалізації сховищ (тиждень 5)
