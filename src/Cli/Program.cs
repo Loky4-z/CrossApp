@@ -2,32 +2,48 @@
 using Core.Dto;
 using Core.Import;
 
-// Беремо шлях з аргументів або використовуємо стандартний
 string path = args.Length > 0 ? args[0] : Path.Combine("data", "sample.csv");
 
-
-// Перевірка, чи існує файл, щоб не було винятку FileNotFoundException
 if (!File.Exists(path))
 {
     Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
     return 1;
 }
 
-ImportResult<ProductDto> result = ProductCsvImporter.Load(path);
+string extension = Path.GetExtension(path).ToLowerInvariant();
 
-Console.WriteLine($"Завантажено записів: {result.Items.Count}");
-foreach (ProductDto p in result.Items.Take(5))
+// Вибір імпортера на основі розширення файлу
+var result = extension switch
 {
-    Console.WriteLine($" {p.Id,-6} {p.Sku,-10} {p.Name,-26} {p.Quantity,5} {p.Unit}");
-}
+    ".csv" => ProductCsvImporter.Load(path),
+    ".json" => ProductJsonImporter.Load(path),
+    _ => throw new NotSupportedException($"Формат файлу {extension} не підтримується")
+};
 
+// Вивід товарів
+Console.WriteLine($"Завантажено товарів: {result.Products.Count}");
+foreach (var p in result.Products)
+    Console.WriteLine($" [Товар] {p.Id,-6} {p.Name,-26} {p.Quantity,5} {p.Unit}");
+
+// Вивід складів
+Console.WriteLine($"\nЗавантажено складів: {result.Warehouses.Count}");
+foreach (var w in result.Warehouses)
+    Console.WriteLine($" [Склад] {w.Id,-6} {w.Name,-15} {w.Location}");
+
+// Вивід помилок
 if (result.Errors.Count > 0)
 {
-    Console.WriteLine($"Пропущено рядків: {result.Errors.Count}");
+    Console.WriteLine($"\nПропущено рядків: {result.Errors.Count}");
     foreach (string e in result.Errors)
-    {
         Console.WriteLine($" ! {e}");
-    }
 }
+
+// Статистика
+int totalAccepted = result.Products.Count + result.Warehouses.Count;
+int total = totalAccepted + result.Errors.Count;
+double errorPercent = total == 0 ? 0 : (double)result.Errors.Count / total * 100;
+
+Console.WriteLine($"\n---");
+Console.WriteLine($"СТАТИСТИКА: усього {total} / прийнято {totalAccepted} / пропущено {result.Errors.Count} / помилок {errorPercent:F1}%");
 
 return 0;
