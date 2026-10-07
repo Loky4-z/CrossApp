@@ -1,49 +1,27 @@
-﻿using Core;
-using Core.Dto;
-using Core.Import;
+﻿using Core.Domain;
 
-string path = args.Length > 0 ? args[0] : Path.Combine("data", "sample.csv");
+Console.WriteLine("--- Сценарій 1: успіх ---");
+Product product = Product.Create("P-001", "sku-001", "Цемент М400 25кг", "шт", 100);
+Console.WriteLine(product);
 
-if (!File.Exists(path))
+product.RegisterArrival(50);
+product.Issue(30);
+Console.WriteLine(product);
+
+Console.WriteLine("\n--- Сценарій 2: порушення інваріантів ---");
+TryDo("видача більша за залишок", () => product.Issue(1000));
+TryDo("порожній SKU", () => Product.Create("P-002", "", "Пісок", "т", 10));
+TryDo("від'ємний залишок", () => Product.Create("P-003", "SKU-003", "Цегла", "шт", -5));
+
+static void TryDo(string title, Action action)
 {
-    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
-    return 1;
+    try
+    {
+        action();
+        Console.WriteLine($" ! {title}: виняток НЕ спрацював — інваріант відсутній!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($" > {title}: {ex.GetType().Name} - {ex.Message}");
+    }
 }
-
-string extension = Path.GetExtension(path).ToLowerInvariant();
-
-// Вибір імпортера на основі розширення файлу
-var result = extension switch
-{
-    ".csv" => ProductCsvImporter.Load(path),
-    ".json" => ProductJsonImporter.Load(path),
-    _ => throw new NotSupportedException($"Формат файлу {extension} не підтримується")
-};
-
-// Вивід товарів
-Console.WriteLine($"Завантажено товарів: {result.Products.Count}");
-foreach (var p in result.Products)
-    Console.WriteLine($" [Товар] {p.Id,-6} {p.Name,-26} {p.Quantity,5} {p.Unit}");
-
-// Вивід складів
-Console.WriteLine($"\nЗавантажено складів: {result.Warehouses.Count}");
-foreach (var w in result.Warehouses)
-    Console.WriteLine($" [Склад] {w.Id,-6} {w.Name,-15} {w.Location}");
-
-// Вивід помилок
-if (result.Errors.Count > 0)
-{
-    Console.WriteLine($"\nПропущено рядків: {result.Errors.Count}");
-    foreach (string e in result.Errors)
-        Console.WriteLine($" ! {e}");
-}
-
-// Статистика
-int totalAccepted = result.Products.Count + result.Warehouses.Count;
-int total = totalAccepted + result.Errors.Count;
-double errorPercent = total == 0 ? 0 : (double)result.Errors.Count / total * 100;
-
-Console.WriteLine($"\n---");
-Console.WriteLine($"СТАТИСТИКА: усього {total} / прийнято {totalAccepted} / пропущено {result.Errors.Count} / помилок {errorPercent:F1}%");
-
-return 0;
