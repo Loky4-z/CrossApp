@@ -1,27 +1,33 @@
-﻿using Core.Domain;
+﻿using Core;
+using Core.Abstractions;
+using Core.Storage;
+using Core.Services;
+using System;
 
-Console.WriteLine("--- Сценарій 1: успіх ---");
-Product product = Product.Create("P-001", "sku-001", "Цемент М400 25кг", "шт", 100);
-Console.WriteLine(product);
+// Створюємо сховище через фабрику
+ICatalogStore store = StoreFactory.Create(args);
+var service = new CatalogService(store);
 
-product.RegisterArrival(50);
-product.Issue(30);
-Console.WriteLine(product);
+Console.WriteLine($"Сховище налаштовано: {store.GetType().Name}");
 
-Console.WriteLine("\n--- Сценарій 2: порушення інваріантів ---");
-TryDo("видача більша за залишок", () => product.Issue(1000));
-TryDo("порожній SKU", () => Product.Create("P-002", "", "Пісок", "т", 10));
-TryDo("від'ємний залишок", () => Product.Create("P-003", "SKU-003", "Цегла", "шт", -5));
+// Успішний сценарій
+var created = service.Add("SKU-101", "Шурупокрут Bosch", "шт", 15);
+service.Receive(created.Id, 5);
+service.Issue(created.Id, 2);
 
-static void TryDo(string title, Action action)
+Console.WriteLine("\n--- Поточний стан складу ---");
+foreach (var p in service.All())
 {
-    try
-    {
-        action();
-        Console.WriteLine($" ! {title}: виняток НЕ спрацював — інваріант відсутній!");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($" > {title}: {ex.GetType().Name} - {ex.Message}");
-    }
+    Console.WriteLine($"{p.Id} {p.Sku,-10} {p.Name,-22} {p.Quantity,5} {p.Unit}");
+}
+
+// Сценарій відмови
+Console.WriteLine("\n--- Сценарій відмови ---");
+try
+{
+    service.Issue("INVALID-ID", 10);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Помилка: {ex.Message}");
 }
