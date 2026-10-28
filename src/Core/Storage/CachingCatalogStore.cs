@@ -17,7 +17,7 @@ public class CachingCatalogStore : ICatalogStore
 
     public Product? GetById(string id)
     {
-        // Якщо є в кеші — віддаємо з кешу
+        // Якщо є в кеші — віддаємо з кешу  
         if (_cache.TryGetValue(id, out var cached)) return cached;
 
         // Якщо ні — йдемо в реальне сховище і кешуємо результат

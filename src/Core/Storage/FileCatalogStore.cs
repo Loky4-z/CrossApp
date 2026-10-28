@@ -5,6 +5,7 @@ using Core.Domain;
 using Core.Dto;
 using System.Text.Json;
 
+// Реалізація сховища у JSON-файлі  
 public sealed class FileCatalogStore : ICatalogStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
@@ -17,11 +18,13 @@ public sealed class FileCatalogStore : ICatalogStore
         _path = Path.GetFullPath(path);
     }
 
+    // Завантажує дані з файлу в пам'ять (кеш). Викликається перед будь-якою дією.
     private void EnsureLoaded()
     {
         if (_loaded) return;
         if (File.Exists(_path))
         {
+            // Читаємо DTO з файлу і перетворюємо їх у доменні сутності Product
             var dtos = JsonSerializer.Deserialize<List<ProductDto>>(File.ReadAllText(_path)) ?? [];
             foreach (var dto in dtos)
             {
@@ -32,6 +35,7 @@ public sealed class FileCatalogStore : ICatalogStore
         _loaded = true;
     }
 
+    // Зберігає всі дані з кешу назад у файл (DTO замість сутностей)
     private void Flush()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
@@ -46,13 +50,12 @@ public sealed class FileCatalogStore : ICatalogStore
         ArgumentNullException.ThrowIfNull(item);
         EnsureLoaded();
         if (_cache.ContainsKey(item.Id)) throw new InvalidOperationException($"Запис з id={item.Id} уже існує.");
+
         _cache.Add(item.Id, item);
-        Flush();
+        Flush(); // Одразу зберігаємо на диск після зміни
     }
 
     public void Update(Product item) { EnsureLoaded(); _cache[item.Id] = item; Flush(); }
     public bool Remove(string id) { EnsureLoaded(); if (!_cache.Remove(id)) return false; Flush(); return true; }
-
-    public IReadOnlyList<Product> Find(Func<Product, bool> predicate)
-        => List().Where(predicate).ToList();
+    public IReadOnlyList<Product> Find(Func<Product, bool> predicate) { EnsureLoaded(); return _cache.Values.Where(predicate).ToList(); }
 }

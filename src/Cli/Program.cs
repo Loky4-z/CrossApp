@@ -1,33 +1,27 @@
-﻿using Core;
-using Core.Abstractions;
+﻿using Core.Abstractions;
 using Core.Storage;
 using Core.Services;
+using Core.Events;
+using Core.Notifications;
 using System;
 
-// Створюємо сховище через фабрику
 ICatalogStore store = StoreFactory.Create(args);
-var service = new CatalogService(store);
 
-Console.WriteLine($"Сховище налаштовано: {store.GetType().Name}");
-
-// Успішний сценарій
-var created = service.Add("SKU-101", "Шурупокрут Bosch", "шт", 15);
-service.Receive(created.Id, 5);
-service.Issue(created.Id, 2);
-
-Console.WriteLine("\n--- Поточний стан складу ---");
-foreach (var p in service.All())
+// Створюємо комбінований синк (консоль + файл) і передаємо через конструктор (ручний DI)
+var notificationSink = new CompositeSink(new INotificationSink[]
 {
-    Console.WriteLine($"{p.Id} {p.Sku,-10} {p.Name,-22} {p.Quantity,5} {p.Unit}");
-}
+    new ConsoleSink(),
+    new FileSink()
+});
 
-// Сценарій відмови
-Console.WriteLine("\n--- Сценарій відмови ---");
-try
-{
-    service.Issue("INVALID-ID", 10);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Помилка: {ex.Message}");
-}
+var service = new CatalogService(store, notificationSink);
+
+Console.WriteLine($"Сховище налаштовано: {store.GetType().Name}\n");
+
+int changes = 0;
+service.Changed += (_, _) => changes++;
+
+var created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
+service.Receive(created.Id, 25);
+
+Console.WriteLine($"\nПодій отримано через лямбду: {changes}");
