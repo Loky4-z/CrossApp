@@ -1,9 +1,10 @@
 ﻿namespace Core.Events;
 
+// Перелік можливих типів змін стану товару на складі
 public enum CatalogChangeKind
 {
-    Added,
-    Received,
-    Issued,
-    Removed
+    Added,    // Додавання нового товару в каталог
+    Received, // Надходження (прихід) товару від постачальника
+    Issued,   // Видача/списання товару зі складу
+    Removed   // Повне видалення позиції з каталогу
 }
