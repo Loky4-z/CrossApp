@@ -1,0 +1,33 @@
+### Перевірка здоров'я сервісу
+GET http://localhost:5080/health
+
+### Отримати список товарів
+GET http://localhost:5080/api/products
+
+### Створити новий товар (POST)
+POST http://localhost:5080/api/products
+Content-Type: application/json
+
+{
+  "sku": "A-100",
+  "name": "Цемент M400",
+  "unit": "мішок",
+  "quantity": 40
+}
+
+### Отримати товар за ID (підстав сюди реальний id із POST)
+GET http://localhost:5080/api/products/{id}
+
+### Оновити товар (PUT)
+PUT http://localhost:5080/api/products/{id}
+Content-Type: application/json
+
+{
+  "sku": "A-100",
+  "name": "Цемент M500 Оновлений",
+  "unit": "мішок",
+  "quantity": 50
+}
+
+### Видалити товар (DELETE)
+DELETE http://localhost:5080/api/products/{id}
