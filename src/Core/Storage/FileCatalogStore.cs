@@ -1,65 +1,106 @@
-﻿using Core.Abstractions;
-using Core.Domain;
-using Core.Dto;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using Core.Abstractions;
+using Core.Domain;
+using Core.Dto;
 
 namespace Core.Storage;
 
-// Реалізація сховища у JSON-файлі
 public sealed class FileCatalogStore : ICatalogStore
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
-    private readonly Dictionary<string, Product> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _path;
+    private readonly Dictionary<string, Product> _cache = new(StringComparer.OrdinalIgnoreCase);
     private bool _loaded;
 
-    public FileCatalogStore(string path)
+    private static readonly JsonSerializerOptions Options = new()
     {
-        _path = Path.GetFullPath(path);
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+    public FileCatalogStore(string fullPath)
+    {
+        _path = fullPath;
     }
 
-    // Завантажує дані з файлу в пам'ять (кеш). Викликається перед будь-якою дією.
     private void EnsureLoaded()
     {
         if (_loaded) return;
-        if (File.Exists(_path))
+        if (!File.Exists(_path)) { _loaded = true; return; }
+
+        var json = File.ReadAllText(_path);
+        var dtos = JsonSerializer.Deserialize<List<ProductDto>>(json, Options) ?? [];
+
+        _cache.Clear();
+        foreach (var dto in dtos)
         {
-            // Читаємо DTO (Core.Dto.ProductDto) з файлу і перетворюємо їх у доменні сутності Product
-            var dtos = JsonSerializer.Deserialize<List<Core.Dto.ProductDto>>(File.ReadAllText(_path)) ?? [];
-            foreach (var dto in dtos)
-            {
-                var p = Product.FromDto(dto);
-                _cache[p.Id] = p;
-            }
+            var product = Product.FromDto(dto);
+            _cache[product.Id] = product;
         }
         _loaded = true;
     }
 
-    // Зберігає всі дані з кешу назад у файл (DTO замість сутностей)
     private void Flush()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        File.WriteAllText(_path, JsonSerializer.Serialize(_cache.Values.Select(p => p.ToDto()).ToList(), Options));
-    }
-
-    public IReadOnlyList<Product> List() { EnsureLoaded(); return _cache.Values.ToList(); }
-    public Product? GetById(string id) { EnsureLoaded(); return _cache.GetValueOrDefault(id); }
-
-    public void Add(Product item)
-    {
-        ArgumentNullException.ThrowIfNull(item);
         EnsureLoaded();
-        if (_cache.ContainsKey(item.Id)) throw new InvalidOperationException($"Запис з id={item.Id} уже існує.");
+        var dtos = _cache.Values.Select(product => product.ToDto()).ToList();
+        var tmp = _path + ".tmp";
 
-        _cache.Add(item.Id, item);
-        Flush(); // Одразу зберігаємо на диск після зміни
+        var dir = Path.GetDirectoryName(_path);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        File.WriteAllText(tmp, JsonSerializer.Serialize(dtos, Options));
+        File.Move(tmp, _path, overwrite: true);
     }
 
-    public void Update(Product item) { EnsureLoaded(); _cache[item.Id] = item; Flush(); }
-    public bool Remove(string id) { EnsureLoaded(); if (!_cache.Remove(id)) return false; Flush(); return true; }
-    public IReadOnlyList<Product> Find(Func<Product, bool> predicate) { EnsureLoaded(); return _cache.Values.Where(predicate).ToList(); }
+    public IReadOnlyList<Product> List()
+    {
+        EnsureLoaded();
+        return _cache.Values.ToList();
+    }
+
+    public Product? GetById(string id)
+    {
+        EnsureLoaded();
+        return _cache.TryGetValue(id, out var p) ? p : null;
+    }
+
+    public IReadOnlyList<Product> Find(Func<Product, bool> predicate)
+    {
+        EnsureLoaded();
+        return _cache.Values.Where(predicate).ToList();
+    }
+
+    public void Add(Product product)
+    {
+        EnsureLoaded();
+        _cache[product.Id] = product;
+        Flush();
+    }
+
+    public void Update(Product product)
+    {
+        EnsureLoaded();
+        _cache[product.Id] = product;
+        Flush();
+    }
+
+    public bool Remove(string id)
+    {
+        EnsureLoaded();
+        if (_cache.Remove(id))
+        {
+            Flush();
+            return true;
+        }
+        return false;
+    }
 }
