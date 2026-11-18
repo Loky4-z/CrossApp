@@ -80,4 +80,25 @@ public sealed class CatalogService
     // Метод із використанням делегата Func<Product, bool> для фільтрації
     public IReadOnlyList<Product> FindAll(Func<Product, bool> predicate) =>
         _store.List().Where(predicate).ToList();
+
+
+
+    public async Task<int> ImportAsync(ICatalogImporter importer, string path, CancellationToken ct = default)
+    {
+        var items = await importer.LoadAsync(path, ct);
+        var added = 0;
+
+        foreach (var item in items)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (_store.GetById(item.Id) is not null) continue; // ідемпотентність[cite: 15]
+
+            _store.Add(item);
+            OnChanged(item, CatalogChangeKind.Added, item.Quantity);
+            added++;
+        }
+
+        return added;
+    }
 }

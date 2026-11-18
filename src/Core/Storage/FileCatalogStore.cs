@@ -1,11 +1,15 @@
-﻿namespace Core.Storage;
-
-using Core.Abstractions;
+﻿using Core.Abstractions;
 using Core.Domain;
 using Core.Dto;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
 
-// Реалізація сховища у JSON-файлі  
+namespace Core.Storage;
+
+// Реалізація сховища у JSON-файлі
 public sealed class FileCatalogStore : ICatalogStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
@@ -24,8 +28,8 @@ public sealed class FileCatalogStore : ICatalogStore
         if (_loaded) return;
         if (File.Exists(_path))
         {
-            // Читаємо DTO з файлу і перетворюємо їх у доменні сутності Product
-            var dtos = JsonSerializer.Deserialize<List<ProductDto>>(File.ReadAllText(_path)) ?? [];
+            // Читаємо DTO (Core.Dto.ProductDto) з файлу і перетворюємо їх у доменні сутності Product
+            var dtos = JsonSerializer.Deserialize<List<Core.Dto.ProductDto>>(File.ReadAllText(_path)) ?? [];
             foreach (var dto in dtos)
             {
                 var p = Product.FromDto(dto);

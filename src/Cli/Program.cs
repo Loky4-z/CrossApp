@@ -1,43 +1,81 @@
-﻿using Core.Abstractions;
-using Core.Storage;
-using Core.Reports;
+﻿using Core;
+using Core.Abstractions;
 using Core.Domain;
+using Core.Reports;
+using Core.Services;
+using Core.Storage;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
-ICatalogStore store = StoreFactory.Create(args);
-var items = store.List();
+// Налаштування кооперативного скасування через Ctrl+C
+using var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-var command = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "report-top";
+// Для демонстрації таймауту (опціонально):
+// cts.CancelAfter(TimeSpan.FromSeconds(2));
 
-switch (command)
+try
 {
-    case "report-top":
-        Print(ReportService.TopByQuantity(items, 5));
-        break;
+    var command = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "report-top";
 
-    case "report-low":
-        Print(ReportService.LowStock(items, 10));
-        break;
+    if (command == "import")
+    {
+        var dataPath = args.SkipWhile(a => a != "import").Skip(1).FirstOrDefault() ?? "data/sample.json";
+        var service = new CatalogService(new InMemoryCatalogStore());
 
-    case "report-groups":
-        foreach (var g in ReportService.ByUnit(items))
-            Console.WriteLine($"  {g.Key,-6}  позицій: {g.Count,3}  сумарно: {g.TotalQuantity,6}");
-        break;
+        // Асинхронний виклик імпорту з передачею токена
+        var added = await service.ImportAsync(new JsonCatalogImporter(), dataPath, cts.Token);
+        Console.WriteLine($"Імпортовано записів: {added}");
+        return;
+    }
 
-    case "report-sum":
-        var t = ReportService.Totals(items);
-        Console.WriteLine($"позицій {t.Items}, всього {t.Total}, середнє {t.Average:F2}, макс {t.Max}");
-        break;
+    ICatalogStore store = StoreFactory.Create(args);
+    var items = store.List();
 
-    case "demo-deferred":
-        RunDeferredDemo(items);
-        break;
+    switch (command)
+    {
+        case "report-top":
+            Print(ReportService.TopByQuantity(items, 5));
+            break;
 
-    default:
-        Console.WriteLine("report-top | report-low | report-groups | report-sum | demo-deferred");
-        break;
+        case "report-low":
+            Print(ReportService.LowStock(items, 10));
+            break;
+
+        case "report-groups":
+            foreach (var g in ReportService.ByUnit(items))
+                Console.WriteLine($"  {g.Key,-6}  позицій: {g.Count,3}  сумарно: {g.TotalQuantity,6}");
+            break;
+
+        case "report-sum":
+            var t = ReportService.Totals(items);
+            Console.WriteLine($"позицій {t.Items}, всього {t.Total}, середнє {t.Average:F2}, макс {t.Max}");
+            break;
+
+        case "demo-deferred":
+            RunDeferredDemo(items);
+            break;
+
+        default:
+            Console.WriteLine("report-top | report-low | report-groups | report-sum | demo-deferred | import [path]");
+            break;
+    }
+}
+catch (OperationCanceledException)
+{
+    Console.WriteLine("Імпорт скасовано.");
+}
+catch (DomainException ex)
+{
+    Console.WriteLine($"Дані відхилено: {ex.Message}");
+}
+catch (FileNotFoundException)
+{
+    Console.WriteLine("Файл не знайдено.");
 }
 
 static void Print(IReadOnlyList<StockLine> lines)
